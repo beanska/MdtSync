@@ -111,6 +111,12 @@ function main {
 			$BootstrapContent | Set-Content -Path "$($share.Path)\Control\Bootstrap.ini" -Force
 		}
 		
+		if ($CustomSettings) {
+			$Logger.Log("Syncing CustomSettings.ini")
+			$BootstrapContent = (Get-Content -Path "$($config.master)\Control\CustomSettings.ini").replace($config.FQDNMaster, $share.FQDNPath).replace($config.FQDNMaster, $share.Path)
+			$BootstrapContent | Set-Content -Path "$($share.Path)\Control\CustomSettings.ini" -Force
+		}
+		
 		
 	}
 }
