@@ -153,9 +153,16 @@ function SyncFolder {
 	$dstItems = Get-ChildItem $Destination -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer
 	
 	$Logger.Log("`tComparing files")
-	$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime
+	if ($dstItem){
+		$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime
+		$foldersToCreate = $diffItems | where { ($_.SideIndicator -eq '<=') -and ($_.PSIsContainer) }
+		$filesToCopy = $diffItems | where { ($_.SideIndicator -eq '<=') -and (!($_.PSIsContainer)) }
+	} else {
+		$foldersToCreate = $srcItems | where { $_.PSIsContainer }
+		$filesToCopy = $srcItems | where { (!($_.PSIsContainer)) }
+	}
 	
-	$foldersToCreate = $diffItems | where { ($_.SideIndicator -eq '<=') -and ($_.PSIsContainer) }
+	
 	$Logger.Log("`tCreating $($foldersToCreate.length) folders on destination")
 	foreach ($item in $foldersToCreate ){
 		$relPath = $item.FullName.Replace("$Source", '')
@@ -170,7 +177,7 @@ function SyncFolder {
 		}
 	}
 	
-	$filesToCopy = $diffItems | where { ($_.SideIndicator -eq '<=') -and (!($_.PSIsContainer)) }
+	
 	$Logger.Log("`tCopying $($filesToCopy.length) files to destination")
 	foreach ($item in $filesToCopy ){
 		$relPath = $item.FullName.Replace("$Source", '')
