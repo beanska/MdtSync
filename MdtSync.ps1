@@ -121,6 +121,19 @@ function main {
 	}
 }
 
+function BuildBoot{
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[string]$Computername,
+		
+		[Parameter(Position = 1, Mandatory = $false)]
+		[switch]$Rebuild
+	)
+	
+	
+	
+}
+
 function SyncFolder {
 	[cmdletbinding()]
 	param (
@@ -142,7 +155,7 @@ function SyncFolder {
 			Try {
 				New-Item -ItemType directory -Path "$Destination" -ErrorAction Stop 
 			} Catch {
-				$Logger.Log("`tUnable to create folder`n $($_.Exception)")
+				$Logger.Log("`tUnable to create folder ""$Destination"".`n $($_.Exception)")
 			}
 	}
 	
@@ -152,9 +165,9 @@ function SyncFolder {
 	$Logger.Log("`tReading destination folder ""$Destination""")
 	$dstItems = Get-ChildItem $Destination -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer
 	
-	$Logger.Log("`tComparing files")
-	if ($dstItem){
-		$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime
+	$Logger.Log("`tComparing files. SRC($($srcItems.length)) vs. DST($($dstItems.length))")
+	if ($dstItems.length -gt 0){
+		$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime 
 		$foldersToCreate = $diffItems | where { ($_.SideIndicator -eq '<=') -and ($_.PSIsContainer) }
 		$filesToCopy = $diffItems | where { ($_.SideIndicator -eq '<=') -and (!($_.PSIsContainer)) }
 	} else {
@@ -165,14 +178,14 @@ function SyncFolder {
 	
 	$Logger.Log("`tCreating $($foldersToCreate.length) folders on destination")
 	foreach ($item in $foldersToCreate ){
-		$relPath = $item.FullName.Replace("$Source", '')
+		$relPath = $item.FullName -ireplace [regex]::Escape($Source), ''
 		
 		if (!(Test-Path "$Destination$relPath")){
 			Try {
 				New-Item -ItemType directory -Path "$Destination$relPath" -ErrorAction Stop 
 				$item | Add-Member -MemberType NoteProperty -Name Done -Value $true -Force 
 			} Catch {
-				$Logger.Log("`tUnable to create folder`n $($_.Exception)")
+				$Logger.Log("`tUnable to create folder ""$Destination$relPath"".`n $($_.Exception)")
 			}
 		}
 	}
@@ -180,7 +193,7 @@ function SyncFolder {
 	
 	$Logger.Log("`tCopying $($filesToCopy.length) files to destination")
 	foreach ($item in $filesToCopy ){
-		$relPath = $item.FullName.Replace("$Source", '')
+		$relPath = $item.FullName -ireplace [regex]::Escape($Source), ''
 		
 		Try {
 			Copy-Item -Path $item.FullName -Destination "$Destination$relPath" -ErrorAction Stop -force
@@ -244,6 +257,8 @@ Class Logger {
 	}
 	
 }
+
+
 
 
 
