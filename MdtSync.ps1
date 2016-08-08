@@ -32,6 +32,10 @@ param (
 	
 	[Parameter(Position = 0, Mandatory = $false, ParameterSetName = "Everything")]
 	[Parameter(ParameterSetName = "Individual")]
+	[switch] $Buildboot,
+	
+	[Parameter(Position = 0, Mandatory = $false, ParameterSetName = "Everything")]
+	[Parameter(ParameterSetName = "Individual")]
 	[string] $ConfigFile = $null,
 	
 	[Parameter(Position = 0, Mandatory = $false, ParameterSetName = "Everything")]
@@ -48,6 +52,9 @@ function main {
 	$Logger = [Logger]::new($LogDir, "MdtSync.log", $true)
 	$config = ProcessConfig ($ConfigFile)
 	
+	$mstFqdnShare = "$($config.master.ComputerName).$($config.master.Domain)\$($config.master.Share)"
+	$mstShare = "$($config.master.ComputerName)\$($config.master.Share)"
+	
 	if ($All) {
 		$Apps = $true
 		$OS = $true
@@ -60,77 +67,130 @@ function main {
 		$RegenBoot = $true
 	}
 	
-	foreach ($share in $config.share) {
+	foreach ($node in $config.node) {
+	
+		$nodeFqdnShare = "$($node.ComputerName).$($node.Domain)\$($node.Share)"
+		$nodeShare = "$($node.ComputerName)\$($node.Share)"
 		
 		if ($Apps) {
 			$Logger.Log("Syncing Apps")
-			SyncFolder -Source "$($config.master)\Applications" -Destination "$($share.Path)\Applications" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'ApplicationGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'Applications.xml'
+			SyncFolder -Source "$($config.master)\Applications" -Destination "$($node.Path)\Applications" -FullSync
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'ApplicationGroups.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Applications.xml'
 		}
 		
 		if ($OS) {
 			$Logger.Log("Syncing Operating Systems")
-			SyncFolder -Source "$($config.master)\Operating Systems" -Destination "$($share.Path)\Operating Systems" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'OperatingSystemGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'OperatingSystems.xml'
+			SyncFolder -Source "$($config.master)\Operating Systems" -Destination "$($node.Path)\Operating Systems" -FullSync
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'OperatingSystemGroups.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'OperatingSystems.xml'
 		}
 		
 		if ($Drivers) {
 			$Logger.Log("Syncing Drivers")
-			SyncFolder -Source "$($config.master)\Out-of-Box Drivers" -Destination "$($share.Path)\Out-of-Box Drivers" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'DriverGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'Drivers.xml'
+			SyncFolder -Source "$($config.master)\Out-of-Box Drivers" -Destination "$($node.Path)\Out-of-Box Drivers" -FullSync
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'DriverGroups.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Drivers.xml'
 		}
 		
 		if ($Packages) {
 			$Logger.Log("Syncing Packages")
-			SyncFolder -Source "$($config.master)\Packages" -Destination "$($share.Path)\Packages" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'PackageGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'Packages.xml'
+			SyncFolder -Source "$($config.master)\Packages" -Destination "$($node.Path)\Packages" -FullSync
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'PackageGroups.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Packages.xml'
 		}
 		
 		if ($Ts) {
 			$Logger.Log("Syncing Task Sequences")
 			$TsFolders = Get-ChildItem "$($config.master)\Control" | Where {$_.PSIsContainer}
 			foreach ($folder in $TsFolders){
-				SyncFolder -Source $folder.FullName -Destination "$($share.Path)\Control\$($folder.Name) -FullSync"		
+				SyncFolder -Source $folder.FullName -Destination "$($node.Path)\Control\$($folder.Name) -FullSync"		
 			}
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'TaskSequenceGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($share.Path)\Control" -Filter 'TaskSequences.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'TaskSequenceGroups.xml'
+			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'TaskSequences.xml'
 		}
 		
 		if ($Scripts) {
 			$Logger.Log("Syncing Scripts")
-			SyncFolder -Source "$($config.master)\Scripts" -Destination "$($share.Path)\Scripts" -FullSync
+			SyncFolder -Source "$($config.master)\Scripts" -Destination "$($node.Path)\Scripts" -FullSync
 		}
 		
 		if ($Bootstrap) {
-			$Logger.Log("Syncing Bootstrap.ini")
-			$BootstrapContent = (Get-Content -Path "$($config.master)\Control\Bootstrap.ini").replace($config.FQDNMaster, $share.FQDNPath).replace($config.FQDNMaster, $share.Path)
-			$BootstrapContent | Set-Content -Path "$($share.Path)\Control\Bootstrap.ini" -Force
+			$Logger.Log("Syncing Bootstrap.ini")		
+			$bsContent = (Get-Content -Path "$($config.master.DsLocal)\Control\Bootstrap.ini")
+			$bsContent = $bsContent | EasyReplace -A $mstFqdnShare -B $nodeFqdnShare
+			$bsContent = $bsContent | EasyReplace -A "$($config.master.ComputerName).$($config.master.Domain)" -B "$($node.ComputerName).$($node.Domain)"
+			$bsContent = $bsContent | EasyReplace -A $mstShare -B $nodeShare
+			$bsContent = $bsContent | EasyReplace -A $config.master.ComputerName -B $node.ComputerName
+			$bsContent | Set-Content -Path "$($node.Path)\Control\Bootstrap.ini" -Force
 		}
 		
 		if ($CustomSettings) {
 			$Logger.Log("Syncing CustomSettings.ini")
-			$BootstrapContent = (Get-Content -Path "$($config.master)\Control\CustomSettings.ini").replace($config.FQDNMaster, $share.FQDNPath).replace($config.FQDNMaster, $share.Path)
-			$BootstrapContent | Set-Content -Path "$($share.Path)\Control\CustomSettings.ini" -Force
+			$csContent = (Get-Content -Path "$($config.master.DsLocal)\Control\CustomSettings.ini")
+			$csContent = $csContent | EasyReplace -A $mstFqdnShare -B $nodeFqdnShare
+			$csContent = $csContent | EasyReplace -A "$($config.master.ComputerName).$($config.master.Domain)" -B "$($node.ComputerName).$($node.Domain)"
+			$csContent = $csContent | EasyReplace -A $mstShare -B $nodeShare
+			$csContent = $csContent | EasyReplace -A $config.master.ComputerName -B $node.ComputerName
+			$csContent | Set-Content -Path "$($node.Path)\Control\CustomSettings.ini" -Force
 		}
 		
-		
+		if ($Buildboot){
+			BuildBoot -Node ($node)
+		}
 	}
 }
 
-function BuildBoot{
+function BuildBoot {
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
-		[string]$Computername,
+		$Node,
 		
 		[Parameter(Position = 1, Mandatory = $false)]
 		[switch]$Rebuild
 	)
 	
+	Invoke-Command -ComputerName $Node.Computername -ScriptBlock {
+		param (
+			$node
+		)
+		Import-Module "C:\Program Files\Microsoft Deployment Toolkit\Bin\MicrosoftDeploymentToolkit.psd1"
+		
+		New-PSDrive -Name "DS" -PSProvider MDTProvider -Root $node.DsLocal
+
+		#Update-MDTDeploymentShare -path "DS:" -Force -Verbose -Compress
+		
+		& wdsutil.exe /Verbose /Progress /Replace-Image /Image:"Lite Touch Windows PE (x64)" /ImageType:Boot /Architecture:x64 /ReplacementImage /ImageFile:"$($node.DsLocal)\Boot\LiteTouchPE_x64.wim"
+		
+		Remove-PSDrive -Name "DS"
+
+	} -ArgumentList $Node
 	
+}
+
+function EasyReplace {
+	[cmdletbinding()]
+	param (
+		[parameter(ValueFromPipeline)]
+		[string[]]$Main,
+		
+		[string]$A,
+		
+		[string]$B
+	)
+	
+	begin {
+		$aEsc = [System.Text.RegularExpressions.Regex]::Escape($A)
+		[String[]]$ret = $null
+	}
+	
+	process {
+		$ret += ($Main -replace ($aEsc, $B))
+	}
+	
+	end {
+		return $ret
+	}
 	
 }
 
