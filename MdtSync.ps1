@@ -74,45 +74,45 @@ function main {
 		
 		if ($Apps) {
 			$Logger.Log("Syncing Apps")
-			SyncFolder -Source "$($config.master)\Applications" -Destination "$($node.Path)\Applications" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'ApplicationGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Applications.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Applications" -Destination "\\$nodeFqdnShare\Applications" -FullSync
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'ApplicationGroups.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'Applications.xml'
 		}
 		
 		if ($OS) {
 			$Logger.Log("Syncing Operating Systems")
-			SyncFolder -Source "$($config.master)\Operating Systems" -Destination "$($node.Path)\Operating Systems" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'OperatingSystemGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'OperatingSystems.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Operating Systems" -Destination "\\$nodeFqdnShare\Operating Systems" -FullSync
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'OperatingSystemGroups.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'OperatingSystems.xml'
 		}
 		
 		if ($Drivers) {
 			$Logger.Log("Syncing Drivers")
-			SyncFolder -Source "$($config.master)\Out-of-Box Drivers" -Destination "$($node.Path)\Out-of-Box Drivers" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'DriverGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Drivers.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Out-of-Box Drivers" -Destination "\\$nodeFqdnShare\Out-of-Box Drivers" -FullSync
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'DriverGroups.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'Drivers.xml'
 		}
 		
 		if ($Packages) {
 			$Logger.Log("Syncing Packages")
-			SyncFolder -Source "$($config.master)\Packages" -Destination "$($node.Path)\Packages" -FullSync
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'PackageGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'Packages.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Packages" -Destination "\\$nodeFqdnShare\Packages" -FullSync
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'PackageGroups.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'Packages.xml'
 		}
 		
 		if ($Ts) {
 			$Logger.Log("Syncing Task Sequences")
-			$TsFolders = Get-ChildItem "$($config.master)\Control" | Where {$_.PSIsContainer}
+			$TsFolders = Get-ChildItem "$($config.master.DsLocal)\Control" | Where {$_.PSIsContainer}
 			foreach ($folder in $TsFolders){
-				SyncFolder -Source $folder.FullName -Destination "$($node.Path)\Control\$($folder.Name) -FullSync"		
+				SyncFolder -Source $folder.FullName -Destination "\\$nodeFqdnShare\Control\$($folder.Name) -FullSync"		
 			}
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'TaskSequenceGroups.xml'
-			SyncFolder -Source "$($config.master)\Control" -Destination "$($node.Path)\Control" -Filter 'TaskSequences.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'TaskSequenceGroups.xml'
+			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'TaskSequences.xml'
 		}
 		
 		if ($Scripts) {
 			$Logger.Log("Syncing Scripts")
-			SyncFolder -Source "$($config.master)\Scripts" -Destination "$($node.Path)\Scripts" -FullSync
+			SyncFolder -Source "$($config.master.DsLocal)\Scripts" -Destination "\\$nodeFqdnShare\Scripts" -FullSync
 		}
 		
 		if ($Bootstrap) {
@@ -122,7 +122,7 @@ function main {
 			$bsContent = $bsContent | EasyReplace -A "$($config.master.ComputerName).$($config.master.Domain)" -B "$($node.ComputerName).$($node.Domain)"
 			$bsContent = $bsContent | EasyReplace -A $mstShare -B $nodeShare
 			$bsContent = $bsContent | EasyReplace -A $config.master.ComputerName -B $node.ComputerName
-			$bsContent | Set-Content -Path "$($node.Path)\Control\Bootstrap.ini" -Force
+			$bsContent | Set-Content -Path "\\$nodeFqdnShare\Control\Bootstrap.ini" -Force
 		}
 		
 		if ($CustomSettings) {
@@ -132,7 +132,7 @@ function main {
 			$csContent = $csContent | EasyReplace -A "$($config.master.ComputerName).$($config.master.Domain)" -B "$($node.ComputerName).$($node.Domain)"
 			$csContent = $csContent | EasyReplace -A $mstShare -B $nodeShare
 			$csContent = $csContent | EasyReplace -A $config.master.ComputerName -B $node.ComputerName
-			$csContent | Set-Content -Path "$($node.Path)\Control\CustomSettings.ini" -Force
+			$csContent | Set-Content -Path "\\$nodeFqdnShare\Control\CustomSettings.ini" -Force
 		}
 		
 		if ($Buildboot){
