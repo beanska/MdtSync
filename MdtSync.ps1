@@ -74,9 +74,15 @@ function main {
 		
 		if ($Apps) {
 			$Logger.Log("Syncing Apps")
-			SyncFolder -Source "$($config.master.DsLocal)\Applications" -Destination "\\$nodeFqdnShare\Applications" -FullSync
+			$srcApps = Get-ChildItem "$($config.master.DsLocal)\Applications" -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer, PSParentPath
+			
+			SyncFolder -SourceRef ([ref]$srcApps) -Destination "\\$nodeFqdnShare\Applications" -FullSync
 			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'ApplicationGroups.xml'
 			SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'Applications.xml'
+			
+			#SyncFolder -Source "$($config.master.DsLocal)\Applications" -Destination "\\$nodeFqdnShare\Applications" -FullSync
+			#SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'ApplicationGroups.xml'
+			#SyncFolder -Source "$($config.master.DsLocal)\Control" -Destination "\\$nodeFqdnShare\Control" -Filter 'Applications.xml'
 		}
 		
 		if ($OS) {
@@ -197,16 +203,21 @@ function EasyReplace {
 function SyncFolder {
 	[cmdletbinding()]
 	param (
-		[Parameter(Position = 0, Mandatory = $true)]
+		[Parameter(Position = 0, Mandatory = $true, ParameterSetName = "ByDir")]
 		[string] $Source,
 		
-		[Parameter(Position = 1, Mandatory = $true)]
+		[Parameter(Position = 0, Mandatory = $true, ParameterSetName = "ByRef")]
+		[ref] $SourceRef,
+		
+		[Parameter(Position = 0, Mandatory = $true, ParameterSetName = "ByDir")]
+		[Parameter(Position = 1, Mandatory = $true, ParameterSetName = "ByRef")]
 		[string] $Destination,
 		
-		[Parameter(Position = 2, Mandatory = $false)]
+		[Parameter(Position = 2, Mandatory = $false, ParameterSetName = "ByDir")]
 		[string] $Filter = "*.*",
 		
-		[Parameter(Position = 3, Mandatory = $false)]
+		[Parameter(Position = 0, Mandatory = $false, ParameterSetName = "ByDir")]
+		[Parameter(Position = 3, Mandatory = $false, ParameterSetName = "ByRef")]
 		[switch] $FullSync
 		
 	)
@@ -219,8 +230,13 @@ function SyncFolder {
 			}
 	}
 	
-	$Logger.Log("`tReading source folder ""$Source""")
-	$srcItems = Get-ChildItem $Source -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer
+	if ($Source) {
+		$Logger.Log("`tReading source folder ""$Source""")
+		$srcItems = Get-ChildItem $Source -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer
+	} else {
+		$srcItems = $SourceRef.Value
+		$Source = ($srcItems.PSParentPath[0] -split '::')[1]
+	}
 	
 	$Logger.Log("`tReading destination folder ""$Destination""")
 	$dstItems = Get-ChildItem $Destination -Recurse -Filter $filter | select Name, Length, LastWriteTime, FullName, PSIsContainer
@@ -238,7 +254,7 @@ function SyncFolder {
 	
 	$Logger.Log("`tCreating $($foldersToCreate.length) folders on destination")
 	foreach ($item in $foldersToCreate ){
-		$relPath = $item.FullName -ireplace [regex]::Escape($Source), ''
+		$relPath = $item.FullName | EasyReplace -A $Source -B ''
 		
 		if (!(Test-Path "$Destination$relPath")){
 			Try {
