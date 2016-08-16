@@ -274,15 +274,19 @@ function SyncFolder {
 	$Logger.Log("`tComparing files. SRC($($srcItems.length)) vs. DST($($dstItems.length))")
 	if ($dstItems.length -gt 0){
 		Try {
-			$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime -ErrorAction Stop
+			#$diffItems = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length -ErrorAction Stop
+			$diffFiles = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length, LastWriteTime -ErrorAction Stop |
+				where { $_.PSIsContainer -eq $false}
+			$diffFolders = Compare-Object -ReferenceObject $srcItems -DifferenceObject $dstItems -PassThru -Property Name, Length -ErrorAction Stop | 
+				where { $_.PSIsContainer -eq $true}
 		} Catch {
 			$Error.exception
 		}
-		$foldersToCreate = $diffItems | where { ($_.SideIndicator -eq '<=') -and ($_.PSIsContainer) }
-		$filesToCopy = $diffItems | where { ($_.SideIndicator -eq '<=') -and (!($_.PSIsContainer)) }
+		$foldersToCreate = $diffFolders | where { $_.SideIndicator -eq '<=' }
+		$filesToCopy = $diffFiles | where { $_.SideIndicator -eq '<=' }
 	} else {
-		$foldersToCreate = $srcItems | where { $_.PSIsContainer }
-		$filesToCopy = $srcItems | where { $_.PSIsContainer -eq $false }
+		$foldersToCreate = $diffFolders
+		$filesToCopy = $diffFiles
 	}
 	
 	
